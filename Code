@@ -1,0 +1,532 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# Importing Necessary libraries and tools
+
+# In[1]:
+
+
+import numpy as np
+import pandas as pd
+import sklearn.metrics as metrics
+import seaborn as sns
+import chart_studio.plotly as py
+import matplotlib.pyplot as plt
+import sklearn, keras, tensorflow, plotly
+from pylab import rcParams
+from matplotlib import gridspec
+from sklearn import linear_model
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import IsolationForest,RandomForestClassifier,AdaBoostClassifier
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.metrics import confusion_matrix, accuracy_score,precision_recall_curve
+from keras.models import Sequential
+from keras.layers import Dense, Dropout
+
+get_ipython().run_line_magic('matplotlib', 'inline')
+sns.set(font_scale=1.2)
+sns.set_style('whitegrid')
+
+
+# #### Thanks to the references given. I have learned alot from them and reused some of their codes with modification
+
+# https://www.kaggle.com/gpreda/credit-card-fraud-detection-predictive-models
+# Random Forest Classifier, 
+# Ada Boost Classifier, 
+# Features importance, 
+# Features density plot 
+# https://www.kaggle.com/pavansanagapati/anomaly-detection-credit-card-fraud-analysis
+# Support Vector Machine, 
+# Isolation Forest, 
+# Local Outlier Factor
+# https://www.kaggle.com/dakshmiglani/credit-card-fraudulent-detection-with-dnn-keras Deep Neural Network
+
+# #### Defining Confusion Matrix (And saving their plots)
+
+# In[2]:
+
+
+def My_confusion_matrix(yactual,ypred,Title):
+    cm=confusion_matrix(yactual,ypred)
+    sns.set(font_scale=2.0)
+    plt.figure(figsize =(6, 6)) 
+    sns.heatmap(cm, xticklabels=['Not Fraud', 'Fraud'],yticklabels=['Not Fraud', 'Fraud'], annot = True,
+                linewidths=.4,linecolor="Green", cmap="Reds",fmt='g') 
+    plt.title(Title, fontsize=20) 
+    plt.ylabel('Actual Data') 
+    plt.xlabel('Prediction from the model') 
+    plt.show()
+    plt.savefig(str(Title) + ".png")
+    
+
+
+# #### Import and scale the data
+
+# In[3]:
+
+
+df = pd.read_csv('creditcard.csv')
+df['Time']=df['Time']%86400
+X=df.iloc[:,:-1]
+y=df['Class']
+X = StandardScaler().fit_transform(X)
+X=pd.DataFrame(X) 
+print ("Normal transaction count is " + str(len(df[df['Class']==0])))
+print ("Fraud transaction count is " +  str(len(df[df['Class']==1])))
+
+
+# ### Ploting a heatmap showing (No strog correlation is found)
+
+# In[4]:
+
+
+plt.figure(figsize=(20,16))
+plt.title("The heat map suggest little to no correletion", fontsize=18) 
+sns.heatmap(df.corr(),cmap="YlGnBu", annot=True, fmt=".1f")
+
+
+# ### Ploting the Normal/Fraud graph for each feature
+
+# In[5]:
+
+
+sns.set(font_scale=1.0)
+plt.rcParams.update({'font.size': 12})
+features = ['Time', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9',
+       'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18',
+       'V19', 'V20', 'V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27',
+       'V28', 'Amount']
+
+counter = 0
+The_Normal_Data = df[y == 0]
+The_Fraud_Data = df[y == 1]
+plt.figure()
+
+fig, ax = plt.subplots(10,3,figsize=(16,60))
+
+for feature in features:
+    counter += 1
+    sns.set_style('whitegrid')
+    plt.subplot(15,2,counter)
+    sns.kdeplot(The_Normal_Data[feature], bw=10,label="Normal")
+    sns.kdeplot(The_Fraud_Data[feature], bw=10,label="Fraud")
+    plt.xlabel(feature, fontsize=10)
+    locs, labels = plt.xticks()
+    plt.tick_params(axis='both', which='major', labelsize=10)
+plt.show();
+
+
+# In[6]:
+
+
+Fraud = df[df['Class']==1]
+Normal = df[df['Class']==0]
+plt.rcParams.update({'font.size': 14,'figure.figsize': (10, 5),'axes.labelsize': 12,'axes.titlesize':12,'ytick.labelsize':12,'xtick.labelsize':12})
+f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+f.suptitle('Time of transaction vs Amount by class ')
+ax1.scatter(Fraud.Time, Fraud.Amount, s=10, marker='*',c="b")
+ax1.set_ylabel('Amount',fontsize=14)
+ax1.set_title('Fraud Transactions',fontsize=14)
+ax2.scatter(Normal.Time, Normal.Amount,s=10, marker='*',c="g")
+
+ax2.set_ylabel('Amount',fontsize=14)
+ax2.set_title('Normal Transactions',fontsize=14)
+plt.xlabel('Time of the day (in Seconds)',fontsize=14)
+#plt.ylabel('Amount',fontsize=14)
+plt.show()
+
+
+# In[7]:
+
+
+x_train,x_test,y_train,y_test = train_test_split(X,y,test_size=0.15,random_state=38)
+yactual=np.array(y_test)
+
+
+# In[ ]:
+
+
+
+
+
+# In[8]:
+
+
+from sklearn.model_selection import cross_val_score
+LR=LogisticRegression(random_state=38,max_iter=1000)
+PLR=[{'solver':["liblinear", "saga"]}]
+GSRF=GridSearchCV(estimator=LR, param_grid=PLR, scoring='accuracy',cv=4)
+scores_rf=cross_val_score(GSRF,x_train,y_train,scoring='accuracy',cv=4)
+
+
+# In[9]:
+
+
+print("The accuracy is  " + str(np.mean(scores_rf)))
+model=GSRF.fit(x_train, y_train)
+pred=model.predict(x_test)
+My_confusion_matrix(yactual,pred,"logistic Search")
+
+
+# In[10]:
+
+
+lgsR = LogisticRegression(solver='liblinear',C=0.75,max_iter=1000)
+lgsR.fit(x_train,y_train)
+ypred=lgsR.predict(x_test)
+
+
+# In[51]:
+
+
+y_lgsR=ypred
+
+
+# In[11]:
+
+
+y_proba=lgsR.predict_proba(x_test)
+pd.DataFrame(y_proba) 
+precision, recall, thresholds = precision_recall_curve(y_test, y_proba[:,1]) 
+pr_auc = metrics.auc(recall, precision)
+plt.title("Precision-Recall vs Threshold Chart")
+plt.xlabel("Threshold")
+plt.ylabel("Precision, Recall")
+plt.plot(thresholds, recall[: -1], "green", label="Recall")
+plt.plot(thresholds, precision[: -1], "black", label="Precision")
+plt.legend(loc="lower center")
+sns.set_style('whitegrid')
+plt.ylim([0,1])
+
+
+# In[12]:
+
+
+Correct_Prediction=[]
+False_Negative=[]
+False_Posative=[]
+y_lgsR=[]
+for THRESHOLD in np.arange(0.025,1,0.05):
+    preds = np.where(y_proba > THRESHOLD, 1, 0)
+    y_ther=preds[:,1]
+    My_confusion_matrix(yactual,y_ther, "THRESHOLD " + f"%.3f" % THRESHOLD )
+    cm=confusion_matrix(yactual,y_ther)
+    Correct_Prediction.append(cm[1][1])
+    False_Negative.append(cm[0][1])
+    False_Posative.append(cm[1][0])
+
+
+# In[13]:
+
+
+Threshold_list=list(np.arange(0.025,1,0.05))
+sns.set(font_scale=1)
+sns.set_style('whitegrid')
+plt.title("Logistic Regression")
+plt.xlabel("Threshold")
+plt.ylabel("Predictions")
+plt.plot(Threshold_list, Correct_Prediction, "green", label="Correct  prediction")
+plt.plot(Threshold_list, False_Negative, "black", label="False Negative")
+plt.plot(Threshold_list, False_Posative, "red", label="False Posative")
+plt.legend(loc="upper center")
+plt.ylim([0,100])
+
+
+# In[14]:
+
+
+THRESHOLD =0.5
+preds = np.where(y_proba > THRESHOLD, 1, 0)
+y_ther=preds[:,1]
+My_confusion_matrix(yactual,y_ther, "THRESHOLD " + f"%.3f" % THRESHOLD )
+
+
+# RandomForestClassifier
+
+# In[15]:
+
+
+Correct_Prediction_rfc=[]
+False_Negative_rfc=[]
+False_Posative_rfc=[]
+for i in range (2,13,2):
+    rfc=RandomForestClassifier(max_depth=i, random_state=38)
+    rfc.fit(x_train,y_train)
+    ypred=rfc.predict(x_test)
+    yactual=np.array(y_test)
+    My_confusion_matrix(yactual,ypred, "Max Depth " + f"%d" %i )    
+    cmyRFC=confusion_matrix(yactual,ypred)
+    Correct_Prediction_rfc.append(cmyRFC[1][1])
+    False_Negative_rfc.append(cmyRFC[0][1])
+    False_Posative_rfc.append(cmyRFC[1][0])     
+
+
+# In[16]:
+
+
+Max_Depth= [2,4,6,8,10,12]
+plt.title("Random Forest")
+plt.xlabel("Max Depth")
+plt.ylabel("Predictions")
+plt.plot(Max_Depth, Correct_Prediction_rfc, "green", label="Correct  prediction")
+plt.plot(Max_Depth, False_Negative_rfc, "black", label="False Negative")
+plt.plot(Max_Depth, False_Posative_rfc, "red", label="False Posative")
+plt.legend(loc="center right")
+plt.ylim([0,100])
+
+
+# In[17]:
+
+
+rfc=RandomForestClassifier(max_depth=10, random_state=38)
+rfc.fit(x_train,y_train)
+ypred=rfc.predict(x_test)
+y_RFC_D10=ypred
+cmy_RFC_D10=confusion_matrix(yactual,ypred)
+
+
+# In[18]:
+
+
+Correct_Prediction_knc=[]
+False_Negative_knc=[]
+False_Posative_knc=[]
+for i in range (2,25,2):
+    knc=KNeighborsClassifier(n_neighbors=i)
+
+    knc.fit(x_train,y_train)
+    ypred=knc.predict(x_test)
+    yactual=np.array(y_test)
+    My_confusion_matrix(yactual,ypred, "N Neighbors " + f"%d" %i )    
+    cmyknc=confusion_matrix(yactual,ypred)
+    Correct_Prediction_knc.append(cmyknc[1][1])
+    False_Negative_knc.append(cmyknc[0][1])
+    False_Posative_knc.append(cmyknc[1][0])   
+
+
+# In[19]:
+
+
+KNC = KNeighborsClassifier(n_neighbors=20)
+KNC.fit(x_train,y_train)
+ypred=KNC.predict(x_test)
+yactual=np.array(y_test)
+yKNC=ypred
+cmyKNC=confusion_matrix(yactual,ypred)
+
+
+# In[20]:
+
+
+Correct_Prediction_ABC=[]
+False_Negative_ABC=[]
+False_Posative_ABC=[]
+for i in range (25,251,25):
+    ABC = AdaBoostClassifier(random_state=38,learning_rate=1,n_estimators=i)
+    ABC.fit(x_train,y_train)
+    ypred=ABC.predict(x_test)
+    yactual=np.array(y_test)
+    My_confusion_matrix(yactual,ypred, "AdaBoost  " + f"%d" %i + " Estimators")    
+    cmyABC=confusion_matrix(yactual,ypred)
+    Correct_Prediction_ABC.append(cmyABC[1][1])
+    False_Negative_ABC.append(cmyABC[0][1])
+    False_Posative_ABC.append(cmyABC[1][0])  
+
+
+# In[21]:
+
+
+ABC = AdaBoostClassifier(random_state=38,learning_rate=1,n_estimators=250)
+ABC.fit(x_train,y_train)
+ypred=ABC.predict(x_test)
+yactual=np.array(y_test)
+yABC=ypred
+cmyABC=confusion_matrix(yactual,ypred)
+
+
+# In[22]:
+
+
+tmp = pd.DataFrame({'Feature': features, 'Feature importance': rfc.feature_importances_})
+#tmp = tmp.sort_values(by='Feature importance',ascending=False)
+plt.figure(figsize = (10,4))
+plt.title('Random Forest Features importance',fontsize=14)
+s = sns.barplot(x='Feature',y='Feature importance',data=tmp)
+s.set_xticklabels(s.get_xticklabels(),rotation=90)
+plt.show() 
+tmp = pd.DataFrame({'Feature': features, 'Feature importance': ABC.feature_importances_})
+#tmp = tmp.sort_values(by='Feature importance',ascending=False)
+plt.figure(figsize = (10,4))
+plt.title('Ada Boost Features importance',fontsize=14)
+s = sns.barplot(x='Feature',y='Feature importance',data=tmp)
+s.set_xticklabels(s.get_xticklabels(),rotation=90)
+plt.show()  
+
+
+# DNN
+
+# In[23]:
+
+
+model = Sequential([
+    Dense(units=30,input_dim=30,activation='relu'),
+    Dense(units=24,activation='relu'),
+    Dropout(0.2),
+    Dense(units=18,activation='relu'),
+    Dense(units=12,activation='relu'),
+    Dense(units=8,activation='relu'),
+    Dropout(0.2),
+    Dense(units=4,activation='relu'),
+    Dense(units=1,activation='sigmoid'),
+])
+
+
+# In[24]:
+
+
+model.compile(optimizer='rmsprop',
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+
+
+# In[25]:
+
+
+model.summary()
+
+
+# In[26]:
+
+
+model.compile(optimizer='adam',loss='binary_crossentropy',metrics=['accuracy'])
+model.fit(x_train,y_train,batch_size=15,epochs=10)
+
+
+# In[27]:
+
+
+loss=model.history.history['loss']
+
+
+# In[28]:
+
+
+sns.lineplot(x=range(len(loss)),y=loss)
+plt.title("Training Loss per Epoch");
+
+
+# In[29]:
+
+
+training_score = model.evaluate(x_train,y_train,verbose=0)
+test_score = model.evaluate(x_test,y_test,verbose=0)
+
+
+# In[30]:
+
+
+print("training score is " , training_score)
+print("Testing score is " , test_score)
+
+
+# In[31]:
+
+
+y_DNN= model.predict(x_test)
+
+
+# In[32]:
+
+
+y_DNN_10=[]
+y_DNN_20=[]
+y_DNN_30=[]
+y_DNN_40=[]
+y_DNN_50=[]
+y_DNN_60=[]
+y_DNN_70=[]
+y_DNN_80=[]
+y_DNN_90=[]
+
+n=len(y_DNN)
+for i in range (n):    
+    y_DNN_10.append(int(y_DNN[i][0] > 0.10))
+    y_DNN_20.append(int(y_DNN[i][0] > 0.20))
+    y_DNN_30.append(int(y_DNN[i][0] > 0.30))
+    y_DNN_40.append(int(y_DNN[i][0] > 0.40))
+    y_DNN_50.append(int(y_DNN[i][0] > 0.50))
+    y_DNN_60.append(int(y_DNN[i][0] > 0.60))
+    y_DNN_70.append(int(y_DNN[i][0] > 0.70))
+    y_DNN_80.append(int(y_DNN[i][0] > 0.80))
+    y_DNN_90.append(int(y_DNN[i][0] > 0.90))
+
+My_confusion_matrix(yactual,y_DNN_10, "DNN 10" )
+My_confusion_matrix(yactual,y_DNN_20, "DNN 20" ) 
+My_confusion_matrix(yactual,y_DNN_30, "DNN 30" ) 
+My_confusion_matrix(yactual,y_DNN_40, "DNN 40" ) 
+My_confusion_matrix(yactual,y_DNN_50, "DNN 50" ) 
+My_confusion_matrix(yactual,y_DNN_60, "DNN 60" ) 
+My_confusion_matrix(yactual,y_DNN_70, "DNN 70" ) 
+My_confusion_matrix(yactual,y_DNN_80, "DNN 80" ) 
+My_confusion_matrix(yactual,y_DNN_90, "DNN 90" ) 
+
+
+# In[33]:
+
+
+y_DNN_50=[]
+
+n=len(y_DNN)
+for i in range (n):
+    y_DNN_50.append(int(y_DNN[i][0] > 0.50))
+
+
+# In[34]:
+
+
+My_confusion_matrix(yactual,y_DNN_50, "DNN " ) 
+
+
+# In[48]:
+
+
+yABC
+
+
+# In[52]:
+
+
+why_frame = pd.DataFrame({'Logestic R': y_lgsR,'Deep Neural Network':y_DNN_50,'Random Forest': y_RFC_D10,'KNC': yKNC,'Ada Boost Classifier': yABC, 'Test Data':yactual })
+
+
+# In[53]:
+
+
+why_frame[why_frame['Test Data'] == 1]
+pd.set_option('display.max_rows', why_frame.shape[0]+1)
+test_is_one=why_frame[why_frame['Test Data'] == 1]
+test_is_one.to_excel("test_is_one.xlsx") 
+why_frame.to_excel("why_frame.xlsx") 
+
+
+# In[54]:
+
+
+non_Null_why=why_frame[(why_frame != 0).any(axis=1)]
+non_Null_why.to_excel("non_Null_why.xlsx") 
+
+
+# In[55]:
+
+
+Test_not_null=why_frame[why_frame['Test Data']==1]
+Test_not_null.to_excel("Test_not_null.xlsx") 
+
+
+# In[ ]:
+
+
+
+
